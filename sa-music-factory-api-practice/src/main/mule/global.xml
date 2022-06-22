@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<configuration doc:name="Configuration" doc:id="369bf675-4622-408f-92e4-9899d728398d" defaultErrorHandler-ref="global-error-handler" />
+	<global-property doc:name="Global Property" doc:id="56945c04-e87c-46b8-9c2b-83dd2d5ba896" name="env" value="local" />
+	<configuration-properties doc:name="Configuration properties" doc:id="88c93c30-1dfe-4ed8-975c-bc98a276bbca" file="${env}.properties" />
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="da708746-ac31-48d8-8ded-65dece6d9279" file="${env}.properties" key="${secureKey}" >
+		<secure-properties:encrypt algorithm="Blowfish" />
+	</secure-properties:config>
+	<global-property doc:name="Global Property" doc:id="c96f07c0-b748-46cd-a57f-168bf6265ed6" name="secureKey" value="password" />
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="41504854-ea8b-4204-994b-e7fbd645c2a6" >
+		<http:listener-connection host="0.0.0.0" port="${http.port}" />
+	</http:listener-config>
+	<error-handler name="global-error-handler" doc:id="8b3b357d-06d5-4aed-a0c8-8cf19f92746e" >
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="20b0582f-3a60-4f80-937c-39480304189b" >
+			<logger level="ERROR" doc:name="Logger" doc:id="02096878-8291-45b4-ad97-092cd8cd00e0" message="#['' ++ write(payload,'application/json')]"/>
+		</on-error-propagate>
+	</error-handler>
+</mule>

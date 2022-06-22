@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd ">
+    <flow name="sa-music-factory-api-main">
+        <http:listener path="/api/*" config-ref="http-listener-config">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+        <set-variable value="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	correlationId: message.attributes.headers.correlation_id,&#10;	clientId: message.attributes.headers.client_id,&#10;	clientSecret: message.attributes.headers.client_secret&#10;}]" doc:name="headerAttributes" doc:id="a1a0b8b7-09a0-4bd5-819e-b8472f0617d7" variableName="headerAttributes"/>
+		<set-variable value="sa-music-factory-api-main::apiKitRouter" doc:name="currentFlow" doc:id="5ec7a405-b9f1-4207-bd67-ef95e1bb8169" variableName="currentFlow"/>
+		<apikit:router config-ref="sa-music-factory-api-config"/>
+		<logger level="INFO" doc:name="Logger" doc:id="0a50a2de-44c3-46e6-9963-cf2ceeda4627" message="#['sa-music-factory-api-main::payload: ' ++ write(payload,'application/json')]"/>
+    </flow>
+    <flow name="sa-music-factory-api-console">
+        <http:listener path="/console/*" config-ref="http-listener-config">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="sa-music-factory-api-config"/>
+    </flow>
+    
+	
+	
+	
+	
+</mule>
