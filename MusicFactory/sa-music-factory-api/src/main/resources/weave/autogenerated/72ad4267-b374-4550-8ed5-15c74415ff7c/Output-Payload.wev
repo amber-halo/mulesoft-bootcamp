@@ -1,0 +1,9 @@
+%dw 2.0
+
+type auto_72ad4267_b374_4550_8ed5_15c74415ff7c_Output_Payload = {|
+  statusCode: String, 
+  message: String, 
+  bioUrl: Null, 
+  recordsUpdated: Number | Null
+|}
+

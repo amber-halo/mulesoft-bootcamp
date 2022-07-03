@@ -1,47 +1,226 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
-	xmlns="http://www.mulesoft.org/schema/mule/core"
-	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
-http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
 	<sub-flow name="impl-get-artists" doc:id="cdeb713c-b239-4b00-a1a0-083602d615b8" >
 		<logger level="INFO" doc:name="INFO START" doc:id="426fa2e2-253b-4b7c-89d5-6e3cb0a1fa2c" message="impl-get-artists::START"/>
-		<set-variable value="#[attributes.queryParams.groupName]" doc:name="groupName" doc:id="c821d0b1-44f1-4150-888c-001798021ba2" variableName="groupName"/>
-		<db:select doc:name="SELECT artist" doc:id="b4bdb467-3e19-4d4b-b257-fed2281e4e37" config-ref="mysql-config">
-			<db:sql ><![CDATA[SELECT ARTIST_ID, GROUP_NM, FIRST_NM, LAST_NM, BIRTH_DATE, MI, DEATH_DATE 	
-    FROM BC_ARTIST 
-	  WHERE GROUP_NM LIKE :groupName]]></db:sql>
-			<db:input-parameters ><![CDATA[#[{
-	groupName: vars.groupName ++ '%'
-}]]]></db:input-parameters>
-		</db:select>
-		<ee:transform doc:name="Transform Message" doc:id="cd8dae42-6879-4012-b9c4-7afb53262d24" >
+		<flow-ref doc:name="sr-build-query-param-list" doc:id="efd6d0d6-7cb3-4640-b898-f8195a28a2c6" name="sr-build-query-param-list" target="queryParamList"/>
+		<flow-ref doc:name="sr-select-artists" doc:id="af7bf6c9-53ac-4c77-ba43-9210ac1d769f" name="sr-select-artists"/>
+	</sub-flow>
+	<sub-flow name="sr-build-query-param-list" doc:id="5abdafb0-15d2-450a-9b3d-da9554bc7a35" >
+		<logger level="INFO" doc:name="INFO START" doc:id="59130784-751d-4d46-a340-5b340de355dd" message="#['sr-build-query-param-list::START::payload: ' ++ write(payload,'application/json')]"/>
+		<ee:transform doc:name="queryParams" doc:id="d048b21c-8faa-4155-9046-07a9621decfe" >
 			<ee:message >
 				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	firstName: attributes.queryParams.firstName,
+	lastName: attributes.queryParams.lastName,
+	dateOfBirth: attributes.queryParams.dateOfBirth,
+	groupName: attributes.queryParams.groupName
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="INFO END payload" doc:id="30111b54-e038-444c-8703-921d7f0f8a10" message="#['sr-build-query-param-list::END::payload: ' ++ write(payload,'application/json')]"/>
+	</sub-flow>
+	<sub-flow name="sr-find-duplicate-artist" doc:id="79c91b37-5ea7-4284-a182-629a90dc18d3" >
+		<logger level="INFO" doc:name="INFO START" doc:id="2d5d5c38-e0c1-467f-bcb9-f52deca18771" message="#['sr-find-duplicate-artist::START::payload: ' ++ write(payload,'application/json')]"/>
+		<set-variable value="#[%dw 2.0&#10;output application/java&#10;var artist = payload.artist&#10;---&#10;{&#10;    groupName: 	artist.groupName,&#10;    firstName: 	artist.firstName,&#10;    lastName:     artist.lastName,&#10;    dateOfBirth:  artist.dateOfBirth&#10; }]" doc:name="queryParamList" doc:id="d73384cd-4af7-4922-bec1-7162975ba987" variableName="queryParamList"/>
+		<logger level="DEBUG" doc:name="DEBUG queryParamList" doc:id="cced55c6-8f6f-4dbc-8087-3c1dd31350b9" message="#['sr-find-duplicate-artist::queryParamList' ++ write(vars.queryParamList,'application/json')]"/>
+		<flow-ref doc:name="sr-select-artists" doc:id="5623b5a7-1dee-4a97-a58a-62dfbdea060a" name="sr-select-artists"/>
+		<logger level="INFO" doc:name="INFO sizeOf" doc:id="5368d964-1d79-41e7-a035-4692be0e701d" message="#['sr-find-duplicate-artist' ++ sizeOf(payload.artists)]"/>
+	</sub-flow>
+	<sub-flow name="sr-select-artists" doc:id="753a7bfe-b3bd-49d0-8dd8-5643df81d762" >
+		<logger level="INFO" doc:name="INFO START" doc:id="635b71f1-f7da-4bd5-8828-87dfb06b5c22" message="#['sr-select-artists::START::payload: ' ++ write(payload,'application/json')]"/>
+		<set-variable value="#[%dw 2.0&#10;   output application/java&#10;---&#10;(&quot;1=1&quot; &#10;    ++ (if(vars.queryParamList.lastName != null) &quot; AND lower(LAST_NM) LIKE concat(lower(:lastName),'%')&quot; else &quot;&quot;)&#10;    ++ (if(vars.queryParamList.firstName != null) &quot; AND lower(FIRST_NM) LIKE concat(lower(:firstName),'%')&quot; else &quot;&quot;)&#10;    ++ (if(vars.queryParamList.groupName != null) &quot; AND lower(GROUP_NM) LIKE concat(lower(:groupName),'%')&quot; else &quot;&quot;)&#10;    ++ (if(vars.queryParamList.dateOfBirth != null) &quot; AND BIRTH_DATE = :dateOfBirth&quot; else &quot;&quot;)&#10;) as String]" doc:name="whereClause" doc:id="5e267533-223d-4e03-b390-a9f64da37739" variableName="whereClause"/>
+		<db:select doc:name="SELECT artist" doc:id="b4bdb467-3e19-4d4b-b257-fed2281e4e37" config-ref="mysql-config">
+			<db:sql><![CDATA[#["SELECT ARTIST_ID, GROUP_NM, FIRST_NM, LAST_NM, BIRTH_DATE, MI, DEATH_DATE 	
+    FROM BC_ARTIST 
+	  WHERE $(vars.whereClause)"]]]></db:sql>
+			<db:input-parameters><![CDATA[#[vars.queryParamList]]]></db:input-parameters>
+		</db:select>
+		<ee:transform doc:name="Transform Message" doc:id="cd8dae42-6879-4012-b9c4-7afb53262d24">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ---
 {
-	statusCode: p("http.get.status.ok"),
-	message: p("http.get.message.ok"),
-	searchCriteria: vars.groupName,
-	artists: payload map ( artist ) -> {
-		artistId: artist.ARTIST_ID,
+		statusCode: p('http.get.status.ok'),
+		message: p('http.get.message.ok'),
+		searchCriteria: ("[" 
+		++ (if(vars.queryParamList.lastName != null) "lastName: '$(vars.queryParamList.lastName)', " else "")
+++ (if(vars.queryParamList.firstName != null) "firstName: '$(vars.queryParamList.firstName)', " else "")
+++ (if(vars.queryParamList.groupName != null) "groupName: '$(vars.queryParamList.groupName)', " else "")
+++ (if(vars.queryParamList.dateOfBirth != null) "birthDate: '$(vars.queryParamList.dateOfBirth)', " else "")
+    	++ "]"	),artists: payload map ( artist ) -> {
+		artistId: artist.ARTIST_ID default 0,
 		groupName: artist.GROUP_NM default "",
 		lastName: artist.LAST_NM default "",
 		firstName: artist.FIRST_NM default "",
-		dateOfBirth: artist.BIRTH_DATE as String {format: "yyyy-MM-dd"} default "",
 		mi: artist.MI default "",
-		dateOfDeath: artist.DEATH_DATE as String {format: "yyyy-MM-dd"} default ""
+		dateOfBirth: artist.BIRTH_DATE as String {format: "yyyy-MM-dd"} default "",
+		(if (artist.DEATH_DATE != null) (dateOfDeath: artist.DEATH_DATE as String {format: "yyyy-MM-dd"}) else dateOfDeath: "")
 	}
 }]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
 	</sub-flow>
 	<sub-flow name="impl-add-artists" doc:id="20715877-6660-4437-a616-b0578ea676c9" >
-		<logger level="INFO" doc:name="INFO START" doc:id="883d8a6d-3052-4ac5-8006-a915c159bc01" message="#['impl-add-artists::START::payload:'  ++ write(payload, 'application/json')]"/>
+		<logger level="INFO" doc:name="INFO size of" doc:id="883d8a6d-3052-4ac5-8006-a915c159bc01" message="#['impl-add-artists::START::sizeOf payload: ' ++ sizeOf(payload.artists)]"/>
+		<ee:transform doc:name="artists, artistsOut, artistsFound" doc:id="de0d9a06-e631-44e1-98d7-1e9f58e8a29f" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="artistsOut" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+				<ee:set-variable variableName="artistsFound" ><![CDATA[%dw 2.0
+output application/json
+---
+[]]]></ee:set-variable>
+				<ee:set-variable variableName="artists" ><![CDATA[%dw 2.0
+output application/json
+---
+payload.artists]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<foreach doc:name="For Each Artist" doc:id="c32698ed-fb31-4325-909e-e834688ea562" collection="#[vars.artists]">
+			<logger level="INFO" doc:name="payload" doc:id="a1b6f987-163d-4da3-8b04-d29a9bda8550" message="#['impl-add-artists::ForEach::payload: ' ++ write(payload,'application/json')]"/>
+			<set-payload value="#[{&#10;	artists: {&#10;		artistId: payload.artistId,&#10;		groupName: payload.groupName,&#10;		lastName: payload.lastName,&#10;		firstName: payload.firstName,&#10;		mi: payload.mi,&#10;		dateOfBirth: payload.dateOfBirth,&#10;		dateOfDeath: payload.dateOfDeath&#10;	}&#10;}]" doc:name="artist" doc:id="0d39271c-1d44-42f2-9b42-40cd85a99f98" />
+			<logger level="DEBUG" doc:name="DEBUG artist" doc:id="e5980bb5-8792-4e0e-bde9-b3d6ea90d22a" message="#['impl-add-artists::ForEach::artist: ' ++ write(payload, 'application/json')]"/>
+			<flow-ref doc:name="sr-find-duplicate-artist" doc:id="edf31ecf-d7d1-4aa1-8368-4d78a18a84e5" name="sr-find-duplicate-artist" target="getArtistResponse"/>
+			<choice doc:name="Artist Found?" doc:id="2e74c943-abff-4475-a3d5-a21f3c9ff8f2" >
+				<when expression="#[vars.getArtistResponse.artists[0]==null]">
+					<flow-ref doc:name="sr-insert-artist" doc:id="9e12b159-1769-4e11-9d9a-5deddeb1d93c" name="sr-insert-artist" target="newArtist" />
+					<set-variable value="#[%dw 2.0&#10;output application/java&#10;---&#10;vars.artistsOut + vars.newArtist]" doc:name="append artistsOut" doc:id="8f03a472-c878-4b8a-9942-f1775992deb6" variableName="artistsOut" />
+					<logger level="INFO" doc:name="artistsOut" doc:id="d0608a64-4a34-4329-97c3-d882369f48f3" message="#['impl-add-artists::ForEach::Choice::artistsOut: ' ++ write(payload,'application/json')]"/>
+				</when>
+				<otherwise >
+					<set-variable value="#[%dw 2.0&#10;output application/json&#10;---&#10;	vars.artistsFound + vars.getArtistResponse.artists[0]]" doc:name="append artistsFound" doc:id="60334487-eda1-446e-b561-f26905d9b4f3" variableName="artistsFound"/>
+				</otherwise>
+			</choice>
+		</foreach>
+		<ee:transform doc:name="add response" doc:id="4fc2c5db-bc6b-470b-94af-1b62b41938b3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"statusCode": if (sizeOf(vars.artistsFound) > 0) p('http.add.status.partial') else p('http.add.status.ok'),
+	"message":  if (sizeOf(vars.artistsFound) > 0) p('http.add.message.partial') else p('http.add.message.ok'),
+    results: {
+		addedCounts: if (vars.artistsOut[0]==null) "0" else sizeOf(vars.artistsOut), 
+		addedArtists: if (vars.artistsOut[0]==null) "[]" else vars.artistsOut, 
+		duplicatedCounts: if (vars.artistsFound[0]==null) "0" else sizeOf(vars.artistsFound), 
+		duplicatedArtists: if (vars.artistsFound[0]==null) "[]" else vars.artistsFound, 
+	}
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</sub-flow>
+	<sub-flow name="sr-insert-artist" doc:id="6eff04e6-36ef-45a2-928c-43d11c078fee" >
+		<logger level="INFO" doc:name="INFO START payload" doc:id="527b86f0-d735-43ec-9888-fd63d80f5bde" message="#['sr-insert-artist::START::artist: ' ++ write(payload,'application/json')]"/>
+		<set-variable value="#[payload.artist]" doc:name="incomingArtist" doc:id="72c5c894-044b-404d-a970-a33fb5e69b6d" variableName="incomingArtist"/>
+		<db:insert doc:name="Insert Artist" doc:id="e38f5dcc-a886-4d1c-8351-43a323d7a722" config-ref="mysql-config">
+			<db:sql ><![CDATA[INSERT INTO BC_MUSIC_FACTORY.BC_ARTIST 
+         (ARTIST_ID, GROUP_NM, FIRST_NM, LAST_NM, MI, BIRTH_DATE, DEATH_DATE, STATUS_CD) 
+         VALUES (NULL, :groupName, :firstName, :lastName, :mi, :birthDate, :deathDate, 'SA')]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    groupName: 	vars.incomingArtist.groupName,
+    firstName: 	vars.incomingArtist.firstName,
+    lastName: 	vars.incomingArtist.lastName,
+    mi: 	  	vars.incomingArtist.mi,
+    birthDate: 	vars.incomingArtist.dateOfBirth,
+    deathDate: 	vars.incomingArtist.dateOfDeath
+}]]]></db:input-parameters>
+		</db:insert>
+		<db:select doc:name="Select Insert" doc:id="aa178a46-bd99-4dfa-a781-ff7091659086" config-ref="mysql-config" target="newArtistId">
+			<db:sql ><![CDATA[SELECT MAX(artist_id) AS artist_id from BC_MUSIC_FACTORY.BC_ARTIST
+    WHERE GROUP_NM = :groupName 
+          AND BIRTH_DATE = :birthDate 
+          AND FIRST_NM = :firstName
+          AND LAST_NM = :lastName]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+    groupName: 	vars.incomingArtist.groupName,
+    firstName: 	vars.incomingArtist.firstName,
+    lastName: 	vars.incomingArtist.lastName,
+    birthDate: 	vars.incomingArtist.dateOfBirth
+}]]]></db:input-parameters>
+		</db:select>
+		<set-payload value="#[output application/java&#10;var artist = vars.incomingArtist&#10;var newArtistId = vars.newArtistId[0].artist_id default 0&#10;---&#10;{&#10;	artistId: 	newArtistId,&#10;	groupName: 	artist.groupName,&#10;	lastName: 	artist.lastName,&#10;	firstName: 	artist.firstName,&#10;	mi:       	artist.mi,&#10;	dateOfBirth: 	artist.dateOfBirth,&#10;	dateOfDeath:	artist.dateOfDeath&#10;}]" doc:name="Update Payload" doc:id="60d4df63-40c3-4e47-bdfd-7d52626b33e1" />
+		<logger level="INFO" doc:name="INFO END payload" doc:id="6382983c-38bc-463d-b739-120d03f9d9de" message="#['sr-insert-artist::END:payload: ' ++ write(payload,'application/json')]"/>
 	</sub-flow>
 	<sub-flow name="impl-update-artist-urls" doc:id="720f17d7-b5dc-4f97-b33c-e8aeab64284b" >
 		<logger level="INFO" doc:name="INFO START" doc:id="7b5bbe04-2bc1-41cc-a513-dd869eed22a6" message="#['impl-update-artist-urls::START::payload:'  ++ write(payload, 'application/json')]"/>
+		<set-variable value="#[%dw 2.0&#10;output application/java&#10;---&#10;{&#10;	method: p('last.fm.method'),&#10;	apiKey: p('last.fm.api.key'),&#10;	format: p('last.fm.format'),&#10;	artist: payload.groupName&#10;}]" doc:name="lastFmProperties" doc:id="af8ed020-c963-482f-953b-0b49a8434c26" variableName="lastFmProperties"/>
+		<flow-ref doc:name="sr-get-artist-info" doc:id="1555a685-bd8e-4511-bb82-c7f15e5c4831" name="sr-get-artist-info" target="lastFmResponse"/>
+		<choice doc:name="Artist Found?" doc:id="7f5037d6-3baf-4326-a3fd-77e1ee5eee6a" >
+			<when expression='#[vars.lastFmResponse.statusCode=="201"]'>
+				<logger level="INFO" doc:name="Placeholder" doc:id="627f5beb-e2c5-4bee-84fa-1dd2679e6584" message="#['impl-update-artists-urls::Choice::Placehoder::payload: ' ++ write(payload, 'application/json')]"/>
+				<flow-ref doc:name="Flow Reference" doc:id="c8c74691-51d0-4668-9d49-c7863d2b44cc" name="sr-patch-artist"/>
+			</when>
+			<otherwise >
+				<ee:transform doc:name="NOT FOUND response" doc:id="c54c8e1a-990f-46ea-afc9-9fb934b56857" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+vars.lastFmResponse]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</otherwise>
+		</choice>
+		<logger level="INFO" doc:name="INFO final response" doc:id="35acf565-7af9-469d-b81c-4823c6959723" message="#['impl-update-artists-urls::FinalResponse::payload: ' ++ write(payload, 'application/json')]"/>
+	</sub-flow>
+	<sub-flow name="sr-get-artist-info" doc:id="4e1213bb-9045-4af8-9c7a-0430491e4896" >
+		<logger level="INFO" doc:name="INFO START lastFmProperties" doc:id="d4dc8829-055f-4d2f-a37d-91b258ebb63a" message="#['sr-get-artist-info::START::payload: ' ++ write(payload, 'application/json')]"/>
+		<http:request method="GET" doc:name="Get Artist Bio" doc:id="e38a097f-cddf-4872-bf22-9dbcf8b15010" config-ref="last-fm-http-config" path="/${last.fm.version}">
+			<http:query-params><![CDATA[#[{
+	"method": vars.lastFmProperties.method,
+	"api_key": vars.lastFmProperties.apiKey,
+	"artist": vars.lastFmProperties.artist,
+	"format": vars.lastFmProperties.format
+}]]]></http:query-params>
+		</http:request>
+		<logger level="DEBUG" doc:name="DEBUG payload" doc:id="880b76b1-8304-410b-bb43-4e107a81c8b3" message="#['impl-update-artists-urls::DEBUG:payload: ' ++ write(payload,'application/json')]" />
+		<ee:transform doc:name="response" doc:id="71dda4bf-3eab-472d-87b8-7ef7e85f0816">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var NOT_FOUND_STATUS = p('http.patch.status.nf')
+var NOT_FOUND_MESSAGE = p('http.patch.message.nf')
+var FOUND_STATUS = p('http.patch.status.ok')
+var FOUND_MESSAGE = p('http.patch.message.ok')
+---
+{
+	statusCode: if(payload.artist.bio.content==null) (NOT_FOUND_STATUS) else (FOUND_STATUS),
+	message: if(payload.artist.bio.content==null) (NOT_FOUND_MESSAGE) else (FOUND_MESSAGE),
+	bioUrl: if(payload.artist.bio.content != null) (	payload.artist.bio.links.link.href)  else (NOT_FOUND_MESSAGE)
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="INFO END payload" doc:id="fba11125-8b33-4d58-9548-0a34a773487c" message="#['sr-get-artist-info::END::payload: ' ++ write(payload, 'application/json')]"/>
+	</sub-flow>
+	<sub-flow name="sr-patch-artist" doc:id="72ad4267-b374-4550-8ed5-15c74415ff7c" >
+		<logger level="INFO" doc:name="INFO START Logger" doc:id="c248615e-d8ef-4465-bb3e-8e95ada6c5f2" message="#['sr-patch-artist::START::lastFmResponse: ' ++ write(vars.lastFmResponse,'application/json')]"/>
+		<set-variable value="#[vars.lastFmResponse.bioUrl]" doc:name="bioUrl" doc:id="e6e15a83-0919-44ac-8bf9-bf05fc1fce64" variableName="bioUrl"/>
+		<db:update doc:name="Update artist" doc:id="2b72829f-417e-4110-97b2-baf1bacc6f3b" config-ref="mysql-config">
+			<db:sql ><![CDATA[UPDATE BC_ARTIST
+  SET bio_url = :bioUrl
+  WHERE group_nm = :groupName]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	bioUrl: vars.bioUrl,
+	groupName: vars.lastFmProperties.artist
+}]]]></db:input-parameters>
+		</db:update>
+		<logger level="DEBUG" doc:name="DEBUG payload" doc:id="8023dc66-115b-4db4-8b0b-35cdda3d0e1d" message="#['sr-patch-artist::Update payload: ' ++ write(payload,'application/json')]"/>
+		<set-payload value="#[%dw 2.0&#10;output application/json&#10;var FOUND_STATUS = p('http.get.status.ok')&#10;var FOUND_MESSAGE = p('http.get.message.ok')&#10;---&#10;{&#10;	statusCode: FOUND_STATUS,&#10;	message: FOUND_MESSAGE,&#10;	bioUrl: vars.bioUrl,&#10;	recordsUpdated: payload.affectedRows&#10;}]" doc:name="Set Payload" doc:id="d2d12e2f-ca2b-4fe7-b270-7c9e3fe03397" />
+		<logger level="INFO" doc:name="INFO END payload" doc:id="8c8237c9-fb49-4209-95be-9b6997c4249f" message="#['sr-patch-artist::END::payload: ' ++ write(payload,'application/json')]"/>
 	</sub-flow>
 </mule>

@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_5abdafb0_15d2_450a_9b3d_da9554bc7a35_Output_Variables_queryParamList = Any
+

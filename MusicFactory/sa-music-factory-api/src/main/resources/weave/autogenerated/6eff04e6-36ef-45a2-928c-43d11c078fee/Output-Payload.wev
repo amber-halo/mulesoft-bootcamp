@@ -1,0 +1,12 @@
+%dw 2.0
+
+type auto_6eff04e6_36ef_45a2_928c_43d11c078fee_Output_Payload = {|
+  artistId: Number, 
+  groupName: Any, 
+  lastName: Any, 
+  firstName: Any, 
+  mi: Any, 
+  dateOfBirth: Any, 
+  dateOfDeath: Any
+|}
+
